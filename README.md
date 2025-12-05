@@ -43,6 +43,23 @@ pytest tests/ -v --cov=app
 
 ---
 
+## Development Workflow
+
+Mappino uses a **feature → develop → master** branching strategy:
+
+- **`feature/*`** - Feature development branches
+- **`develop`** - Integration & staging branch
+- **`master`** - Production releases
+
+### Deployments
+- **Staging:** Push to `develop` → https://mappino-api-staging-428522622484.us-central1.run.app
+- **Production:** Merge to `master` → https://mappino-api-sppjwo3eyq-uc.a.run.app
+- **Automated:** GitHub Actions handles CI/CD
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for complete workflow details.
+
+---
+
 ## Project Structure
 
 ```
@@ -143,43 +160,52 @@ bandit -r backend/app/
 
 ## Deployment
 
-### Deploy to Google Cloud Run
+### Automated Deployment (Recommended)
 
-1. **Setup Infrastructure** (one-time):
+**Staging Environment:**
+1. Push to `develop` branch
+2. GitHub Actions automatically deploys to staging
+3. Verify at https://mappino-api-staging-428522622484.us-central1.run.app
+
+**Production Environment:**
+1. Create PR from `develop` → `master`
+2. After approval, merge to `master`
+3. GitHub Actions automatically deploys to production
+4. Live at https://mappino-api-sppjwo3eyq-uc.a.run.app
+
+See [.github/workflows/deploy.yml](.github/workflows/deploy.yml) for deployment configuration.
+
+### Initial Setup (One-Time)
+
+**1. Setup GCP Infrastructure:**
    ```bash
    # Linux/macOS
-   ./setup/setup_infra.sh my-project-id us-central1
+   ./setup/setup_infra.sh mappino-app us-central1
 
    # Windows
-   .\setup\setup_infra.ps1 -ProjectId "my-project-id" -Region "us-central1"
+   .\setup\setup_infra.ps1 -ProjectId "mappino-app" -Region "us-central1"
    ```
 
-2. **Configure GitHub Secrets**:
+**2. Configure GitHub Secrets:**
    - `GCP_PROJECT_ID` - Your GCP project ID
    - `GCP_SA_KEY` - Service account key (from setup script)
-   - `GCP_REGION` - Cloud Run region
+   - `GCP_REGION` - Cloud Run region (e.g., us-central1)
+   - `FIREBASE_ENABLED` - Set to "true" if using Firebase
+   - `FIREBASE_PROJECT_ID` - Firebase project ID (optional)
 
-3. **Push to GitHub**:
-   ```bash
-   git push origin main
-   ```
+**3. Branch Protection:**
+   - Configure in GitHub: Settings → Branches → Branch protection rules
+   - See [CONTRIBUTING.md](CONTRIBUTING.md) for recommended settings
 
-   GitHub Actions will automatically build, test, and deploy to Cloud Run.
-
-### Manual Deployment
+### Manual Deployment (Advanced)
 ```bash
-# Build Docker image
-docker build -t gcr.io/my-project/peppol-api:latest ./backend
+# Build and deploy staging
+docker build -t us-central1-docker.pkg.dev/mappino-app/mappino-api/mappino-api-staging:latest ./backend
+gcloud run deploy mappino-api-staging --image us-central1-docker.pkg.dev/mappino-app/mappino-api/mappino-api-staging:latest --region us-central1
 
-# Push to GCR
-docker push gcr.io/my-project/peppol-api:latest
-
-# Deploy to Cloud Run
-gcloud run deploy peppol-api \
-  --image gcr.io/my-project/peppol-api:latest \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated
+# Build and deploy production
+docker build -t us-central1-docker.pkg.dev/mappino-app/mappino-api/mappino-api:latest ./backend
+gcloud run deploy mappino-api --image us-central1-docker.pkg.dev/mappino-app/mappino-api/mappino-api:latest --region us-central1
 ```
 
 ---

@@ -14,7 +14,7 @@ name: Deploy to Cloud Run
 
 on:
   push:
-    branches: [main, master]
+    branches: [master, develop]
     paths:
       - "backend/**"
       - ".github/workflows/deploy.yml"
@@ -30,8 +30,8 @@ on:
           - production
 
 env:
-  SERVICE_NAME: mappino-api
-  DOCKER_IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mappino-api/mappino-api
+  SERVICE_NAME: ${{ github.ref == 'refs/heads/master' && 'mappino-api' || 'mappino-api-staging' }}
+  DOCKER_IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mappino-api/${{ github.ref == 'refs/heads/master' && 'mappino-api' || 'mappino-api-staging' }}
 
 jobs:
   # ===========================================

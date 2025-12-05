@@ -100,13 +100,18 @@ coverage.xml
 # Ruff / Linting
 .ruff_cache/
 
-# Documentation (private - not for GitHub)
-docs/
+# Documentation - Track workflow docs, ignore deployment notes
+docs/NEXT_STEPS.md
+docs/bootstrap/
+docs/firebase/FIREBASE_*.md
+docs/security/
 DEPLOYMENT.md
 QUICKSTART-DEPLOYMENT.md
 CLAUDE.md
-*.md
+# Allow workflow documentation
 !README.md
+!CONTRIBUTING.md
+!PROJECT_STATUS.md
 
 # Setup scripts (contain sensitive info)
 setup/

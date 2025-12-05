@@ -10,13 +10,13 @@ name: Test
 
 on:
   push:
-    branches: [main, master, develop]
+    branches: ['**']
     paths:
       - "backend/**"
       - "requirements.txt"
       - ".github/workflows/test.yml"
   pull_request:
-    branches: [main, master, develop]
+    branches: [master, develop]
     paths:
       - "backend/**"
       - "requirements.txt"
