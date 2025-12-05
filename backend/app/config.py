@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     # ===========================================
     # File Paths (relative to project root)
     # ===========================================
-    base_dir: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent.parent)
+    base_dir: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent)
 
     @property
     def schemas_dir(self) -> Path:
