@@ -50,6 +50,10 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Copy application code
 COPY app/ ./app/
 
+# Copy entrypoint script
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
 # Create directories for data and schemas (will be mounted as volumes in production)
 RUN mkdir -p /app/schemas/xsd /app/schemas/schematron /app/schemas/rules \
     /app/mappers/user_uploads /app/data/codelists /app/data/output \
@@ -70,12 +74,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-# Run the application
-# Using uvicorn with production settings
-# Cloud Run sets PORT environment variable, default to 8000 for local
-CMD python -m uvicorn app.main:app \
-    --host 0.0.0.0 \
-    --port ${PORT:-8000} \
-    --workers 2 \
-    --proxy-headers \
-    --forwarded-allow-ips "*"
+# Run the application via entrypoint script
+# The script handles PORT environment variable from Cloud Run
+CMD ["/app/entrypoint.sh"]
