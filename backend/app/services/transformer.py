@@ -13,6 +13,8 @@ from dataclasses import dataclass
 
 import lxml.etree as ET
 
+from ..config import settings
+
 # Try to import saxonche (optional dependency for XSLT 2.0/3.0)
 try:
     from saxonche import PySaxonProcessor
@@ -51,7 +53,7 @@ class TransformerService:
     _saxon_processor: Optional["PySaxonProcessor"] = None
 
     def __init__(self, mappers_dir: Optional[Path] = None):
-        self.mappers_dir = mappers_dir or Path(__file__).parent.parent.parent.parent / "mappers"
+        self.mappers_dir = mappers_dir or settings.mappers_dir
         self.mappers_dir.mkdir(parents=True, exist_ok=True)
 
         # User-uploaded mappers directory

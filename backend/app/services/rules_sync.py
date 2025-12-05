@@ -17,14 +17,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from ..config import settings
+
 logger = logging.getLogger(__name__)
 
-# Base directories
-BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
-SCHEMAS_DIR = BASE_DIR / "schemas"
-XSD_DIR = SCHEMAS_DIR / "xsd"
-SCHEMATRON_DIR = SCHEMAS_DIR / "schematron"
-RULES_DIR = SCHEMAS_DIR / "rules"
+# Base directories from config
+BASE_DIR = settings.base_dir
+SCHEMAS_DIR = settings.schemas_dir
+XSD_DIR = settings.xsd_dir
+SCHEMATRON_DIR = settings.schematron_dir
+RULES_DIR = settings.rules_dir
 
 # Download sources
 SOURCES = {

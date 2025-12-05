@@ -6,13 +6,14 @@ import json
 import re
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Optional
 
 import requests
 
+from ..config import settings
+
 CODELISTS_BASE = "https://docs.peppol.eu/edelivery/codelists"
-CACHE_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data" / "codelists"
+CACHE_DIR = settings.codelists_dir
 CACHE_TTL_HOURS = 24  # Refresh once per day
 
 
