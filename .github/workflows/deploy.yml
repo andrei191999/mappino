@@ -31,7 +31,7 @@ on:
 
 env:
   SERVICE_NAME: mappino-api
-  DOCKER_IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/mappino-api
+  DOCKER_IMAGE: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/mappino-api/mappino-api
 
 jobs:
   # ===========================================
@@ -96,8 +96,8 @@ jobs:
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
 
-      - name: Configure Docker for GCR
-        run: gcloud auth configure-docker --quiet
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
 
       # ===========================================
       # Build Docker Image
