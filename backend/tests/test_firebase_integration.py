@@ -93,7 +93,9 @@ class TestFirebaseAuthService:
     async def test_create_user_already_exists(self, auth_service):
         """Test user creation when email already exists."""
         with patch.object(
-            firebase_auth, "create_user", side_effect=firebase_auth.EmailAlreadyExistsError("Email exists")
+            firebase_auth, "create_user", side_effect=firebase_auth.EmailAlreadyExistsError(
+                "Email exists", cause=None, http_response=None
+            )
         ):
             with pytest.raises(FirebaseAuthError) as exc_info:
                 await auth_service.create_user(email="existing@example.com", password="password123")
