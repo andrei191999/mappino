@@ -3,15 +3,15 @@ XSD Validator - Local XML Schema validation using lxml
 Fast structural validation without external API calls.
 """
 import time
-from pathlib import Path
 from typing import Optional
 
 import lxml.etree as ET
 
+from ...config import settings
 from .base import BaseValidator, ValidationResult, ValidationIssue, Severity
 
-# XSD files directory
-XSD_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "schemas" / "xsd"
+# XSD files directory from config
+XSD_DIR = settings.xsd_dir
 
 
 class XSDValidator(BaseValidator):

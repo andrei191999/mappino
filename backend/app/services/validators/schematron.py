@@ -3,15 +3,15 @@ Schematron Validator - Business rule validation using Schematron/XSLT.
 Validates against EN 16931 and Peppol BIS rules.
 """
 import time
-from pathlib import Path
 from typing import Optional
 
 import lxml.etree as ET
 
+from ...config import settings
 from .base import BaseValidator, ValidationResult, ValidationIssue, Severity
 
-# Schematron files directory
-SCHEMATRON_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent / "schemas" / "schematron"
+# Schematron files directory from config
+SCHEMATRON_DIR = settings.schematron_dir
 
 # SVRL namespace
 SVRL_NS = "http://purl.oclc.org/dml/svrl"
