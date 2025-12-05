@@ -1,0 +1,132 @@
+# ===========================================
+# GitHub Actions - Test Workflow
+# ===========================================
+# Runs on every push and pull request
+# - Linting (optional)
+# - Unit tests
+# - Coverage report
+
+name: Test
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - "backend/**"
+      - "requirements.txt"
+      - ".github/workflows/test.yml"
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - "backend/**"
+      - "requirements.txt"
+      - ".github/workflows/test.yml"
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+      # ===========================================
+      # Checkout and Setup
+      # ===========================================
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      # ===========================================
+      # Dependencies
+      # ===========================================
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov
+
+      # ===========================================
+      # Create test directories
+      # ===========================================
+      - name: Create required directories
+        run: |
+          mkdir -p schemas/xsd schemas/schematron schemas/rules
+          mkdir -p mappers/user_uploads
+          mkdir -p data/codelists data/output
+
+      # ===========================================
+      # Run Tests
+      # ===========================================
+      - name: Run tests with coverage
+        working-directory: backend
+        run: |
+          pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
+
+      # ===========================================
+      # Coverage Report (optional)
+      # ===========================================
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v3
+        with:
+          file: backend/coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # ===========================================
+  # Lint Job (optional)
+  # ===========================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install linting tools
+        run: |
+          pip install ruff
+
+      - name: Run Ruff linter
+        run: |
+          ruff check backend/app/ --output-format=github
+        continue-on-error: true  # Don't fail CI on lint warnings (for now)
+
+  # ===========================================
+  # Build Docker Image (verify it builds)
+  # ===========================================
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: false
+          tags: peppol-tools-api:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

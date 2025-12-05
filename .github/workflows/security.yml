@@ -1,0 +1,445 @@
+name: Security Scanning
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    # Run weekly security scan every Monday at 8 AM UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # Python Security Scanning with Bandit
+  # ============================================================================
+  bandit:
+    name: Bandit Security Linter
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r backend/app \
+            -f json \
+            -o bandit-report.json \
+            --severity-level medium \
+            --confidence-level medium \
+            --exit-zero
+
+      - name: Run Bandit with output for review
+        run: |
+          bandit -r backend/app \
+            -f txt \
+            --severity-level medium \
+            --confidence-level medium
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Check for high/critical issues
+        run: |
+          # Fail if high or critical severity issues found
+          if bandit -r backend/app --severity-level high --confidence-level medium --exit-zero -f custom --msg-template "{severity}: {msg} in {fname}:{line}" | grep -E "HIGH|CRITICAL"; then
+            echo "::error::High or critical severity security issues found!"
+            exit 1
+          fi
+
+  # ============================================================================
+  # Dependency Vulnerability Scanning with pip-audit
+  # ============================================================================
+  pip-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          pip-audit --requirement requirements.txt \
+            --format json \
+            --output pip-audit-report.json \
+            || true
+
+      - name: Display vulnerabilities
+        run: |
+          pip-audit --requirement requirements.txt --format cyclonedx-json
+
+      - name: Upload pip-audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
+      - name: Check for critical vulnerabilities
+        run: |
+          # Fail on critical/high vulnerabilities (customize threshold as needed)
+          pip-audit --requirement requirements.txt --vulnerability-service osv
+
+  # ============================================================================
+  # Alternative: Safety for dependency scanning
+  # ============================================================================
+  safety:
+    name: Safety Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Safety
+        run: pip install safety
+
+      - name: Run Safety check
+        run: |
+          safety check --requirement requirements.txt \
+            --json \
+            --output safety-report.json \
+            --continue-on-error \
+            || true
+
+      - name: Display Safety results
+        run: |
+          safety check --requirement requirements.txt || true
+
+      - name: Upload Safety results
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-report
+          path: safety-report.json
+          retention-days: 30
+
+  # ============================================================================
+  # Secret Scanning with TruffleHog
+  # ============================================================================
+  trufflehog:
+    name: TruffleHog Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive scan
+
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified --json --debug
+
+  # ============================================================================
+  # Alternative: Gitleaks Secret Scanning
+  # ============================================================================
+  gitleaks:
+    name: Gitleaks Secret Detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}  # Optional: for Gitleaks Pro features
+
+  # ============================================================================
+  # Docker Image Scanning with Trivy
+  # ============================================================================
+  trivy-docker:
+    name: Trivy Docker Image Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          # Build the Docker image for scanning
+          if [ -f Dockerfile ]; then
+            docker build -t mappino:latest .
+          else
+            echo "No Dockerfile found, skipping Docker scan"
+            exit 0
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'mappino:latest'
+          format: 'sarif'
+          output: 'trivy-docker-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'  # Don't fail the build, just report
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-docker-results.sarif'
+
+      - name: Run Trivy for JSON report
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'mappino:latest'
+          format: 'json'
+          output: 'trivy-docker-report.json'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+      - name: Upload Trivy JSON report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-docker-report
+          path: trivy-docker-report.json
+          retention-days: 30
+
+      - name: Check for critical Docker vulnerabilities
+        run: |
+          # Parse JSON and fail if critical vulnerabilities found
+          if [ -f trivy-docker-report.json ]; then
+            CRITICAL_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-docker-report.json)
+            HIGH_COUNT=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-docker-report.json)
+
+            echo "Critical vulnerabilities: $CRITICAL_COUNT"
+            echo "High vulnerabilities: $HIGH_COUNT"
+
+            # Fail if critical vulnerabilities found (customize threshold)
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo "::error::Found $CRITICAL_COUNT critical vulnerabilities in Docker image!"
+              exit 1
+            fi
+          fi
+
+  # ============================================================================
+  # Filesystem Scanning with Trivy
+  # ============================================================================
+  trivy-fs:
+    name: Trivy Filesystem Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-fs-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy filesystem results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-fs-results.sarif'
+
+      - name: Run Trivy for detailed report
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+  # ============================================================================
+  # Configuration Security Scanning with Trivy
+  # ============================================================================
+  trivy-config:
+    name: Trivy Configuration Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy config scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-config-results.sarif'
+          exit-code: '0'
+
+      - name: Upload Trivy config results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-config-results.sarif'
+
+      - name: Display config issues
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'table'
+
+  # ============================================================================
+  # SAST with CodeQL (GitHub Advanced Security)
+  # ============================================================================
+  codeql:
+    name: CodeQL SAST Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended,security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  # ============================================================================
+  # Generate Consolidated Security Report
+  # ============================================================================
+  security-report:
+    name: Consolidated Security Report
+    runs-on: ubuntu-latest
+    needs: [bandit, pip-audit, safety, trivy-docker, trivy-fs]
+    if: always()
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Generate summary report
+        run: |
+          echo "# Security Scan Summary" > security-summary.md
+          echo "" >> security-summary.md
+          echo "Scan Date: $(date)" >> security-summary.md
+          echo "" >> security-summary.md
+
+          echo "## Bandit (Python Security)" >> security-summary.md
+          if [ -f bandit-security-report/bandit-report.json ]; then
+            echo "Results available in artifact" >> security-summary.md
+          fi
+          echo "" >> security-summary.md
+
+          echo "## Dependency Vulnerabilities" >> security-summary.md
+          if [ -f pip-audit-report/pip-audit-report.json ]; then
+            echo "Results available in artifact" >> security-summary.md
+          fi
+          echo "" >> security-summary.md
+
+          echo "## Docker Image Vulnerabilities" >> security-summary.md
+          if [ -f trivy-docker-report/trivy-docker-report.json ]; then
+            echo "Results available in artifact" >> security-summary.md
+          fi
+          echo "" >> security-summary.md
+
+          cat security-summary.md
+
+      - name: Upload consolidated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-summary
+          path: security-summary.md
+          retention-days: 90
+
+      - name: Comment on PR with summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('security-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+  # ============================================================================
+  # Security Score and Compliance Check
+  # ============================================================================
+  security-score:
+    name: Security Compliance Check
+    runs-on: ubuntu-latest
+    needs: [bandit, pip-audit, trivy-docker, trivy-fs, gitleaks]
+    if: always()
+    steps:
+      - name: Evaluate security posture
+        run: |
+          echo "Evaluating security scan results..."
+
+          # Check job statuses
+          BANDIT_STATUS="${{ needs.bandit.result }}"
+          PIP_AUDIT_STATUS="${{ needs.pip-audit.result }}"
+          TRIVY_DOCKER_STATUS="${{ needs.trivy-docker.result }}"
+          TRIVY_FS_STATUS="${{ needs.trivy-fs.result }}"
+          GITLEAKS_STATUS="${{ needs.gitleaks.result }}"
+
+          echo "Bandit: $BANDIT_STATUS"
+          echo "pip-audit: $PIP_AUDIT_STATUS"
+          echo "Trivy Docker: $TRIVY_DOCKER_STATUS"
+          echo "Trivy Filesystem: $TRIVY_FS_STATUS"
+          echo "Gitleaks: $GITLEAKS_STATUS"
+
+          # Fail if any critical checks failed
+          if [[ "$GITLEAKS_STATUS" == "failure" ]]; then
+            echo "::error::Secret scanning detected issues!"
+            exit 1
+          fi
+
+          if [[ "$BANDIT_STATUS" == "failure" ]]; then
+            echo "::error::Python security issues detected!"
+            exit 1
+          fi
+
+          echo "Security compliance check passed!"

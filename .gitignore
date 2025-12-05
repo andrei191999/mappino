@@ -1,0 +1,117 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Data and caches (contains customer data)
+data/
+schemas/xsd/*.xsd
+schemas/xsd/common/
+schemas/schematron/peppol-bis3/
+schemas/schematron/en16931/
+schemas/sync_status.json
+mappers/user_uploads/
+
+# Environment
+.env
+.env.local
+.env.*.local
+*.env
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.temp
+*.bak
+
+# Secrets (never commit these)
+credentials.json
+serviceAccountKey.json
+firebase-credentials-*.json
+firebase-*.json
+*-credentials.json
+*.pem
+*.key
+credentials/
+gcp-sa-key.json
+setup/gcp-sa-key.json
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+emulator-data/
+
+# Coverage
+coverage.xml
+.coverage.*
+
+# Docker
+.docker/
+
+# Ruff / Linting
+.ruff_cache/
+
+# Documentation (private - not for GitHub)
+docs/
+DEPLOYMENT.md
+QUICKSTART-DEPLOYMENT.md
+CLAUDE.md
+*.md
+!README.md
+
+# Setup scripts (contain sensitive info)
+setup/
+
+# AI files
+.claude/
+.cursor/
+.copilot/

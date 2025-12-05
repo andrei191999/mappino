@@ -1,0 +1,226 @@
+# Dependabot configuration for automated dependency updates
+# Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # ============================================================================
+  # Python Dependencies (pip)
+  # ============================================================================
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "UTC"
+
+    # Number of open pull requests allowed
+    open-pull-requests-limit: 10
+
+    # Assignees for pull requests
+    # assignees:
+    #   - "username"
+
+    # Reviewers for pull requests
+    # reviewers:
+    #   - "username"
+    #   - "team/team-name"
+
+    # Labels to apply to pull requests
+    labels:
+      - "dependencies"
+      - "python"
+      - "automated"
+
+    # Commit message prefix
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+
+    # Allow both direct and indirect dependency updates
+    allow:
+      - dependency-type: "all"
+
+    # Automatically rebase pull requests when they become outdated
+    rebase-strategy: "auto"
+
+    # Group updates by dependency type
+    groups:
+      # Security updates - highest priority
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "security"
+
+      # Production dependencies
+      production-dependencies:
+        patterns:
+          - "fastapi"
+          - "uvicorn"
+          - "pydantic*"
+          - "httpx"
+          - "lxml"
+          - "saxonche"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Validation and XML processing
+      validation-dependencies:
+        patterns:
+          - "xmlschema"
+          - "pyschematron"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Development dependencies
+      development-dependencies:
+        patterns:
+          - "pytest*"
+          - "black"
+          - "ruff"
+          - "mypy"
+        update-types:
+          - "minor"
+          - "patch"
+
+    # Ignore specific dependencies or versions
+    ignore:
+      # Example: Ignore major version updates for stable dependencies
+      # - dependency-name: "fastapi"
+      #   update-types: ["version-update:semver-major"]
+
+      # Example: Ignore specific versions with known issues
+      # - dependency-name: "lxml"
+      #   versions: ["4.9.3"]
+
+    # Enable version updates for dependencies with vulnerabilities
+    versioning-strategy: "increase"
+
+  # ============================================================================
+  # Docker Dependencies
+  # ============================================================================
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "08:00"
+      timezone: "UTC"
+
+    open-pull-requests-limit: 5
+
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+
+    rebase-strategy: "auto"
+
+    # Group Docker base image updates
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ============================================================================
+  # GitHub Actions
+  # ============================================================================
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "08:00"
+      timezone: "UTC"
+
+    open-pull-requests-limit: 5
+
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+    rebase-strategy: "auto"
+
+    # Group GitHub Actions updates
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+# ============================================================================
+# Auto-merge Configuration (Optional)
+# ============================================================================
+# To enable auto-merge for patch and minor updates, you can use GitHub CLI
+# or GitHub Actions workflow. Example workflow:
+#
+# name: Dependabot Auto-merge
+# on: pull_request
+#
+# permissions:
+#   contents: write
+#   pull-requests: write
+#
+# jobs:
+#   auto-merge:
+#     runs-on: ubuntu-latest
+#     if: github.actor == 'dependabot[bot]'
+#     steps:
+#       - name: Enable auto-merge for Dependabot PRs
+#         run: gh pr merge --auto --squash "$PR_URL"
+#         env:
+#           PR_URL: ${{github.event.pull_request.html_url}}
+#           GH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+# ============================================================================
+# Best Practices
+# ============================================================================
+# 1. Security Updates: Always applied immediately (grouped separately)
+# 2. Patch Updates: Low risk, can be auto-merged with proper CI/CD
+# 3. Minor Updates: Moderate risk, review recommended
+# 4. Major Updates: High risk, always require manual review
+# 5. Keep open-pull-requests-limit reasonable to avoid noise
+# 6. Use labels for easy filtering and triage
+# 7. Group related dependencies to reduce PR count
+# 8. Test all updates in CI/CD before merging
+# 9. Schedule updates on different days to spread the load
+# 10. Use ignore list for problematic dependencies
+
+# ============================================================================
+# Monitoring
+# ============================================================================
+# Monitor Dependabot activity:
+# 1. GitHub Security tab -> Dependabot alerts
+# 2. GitHub Insights -> Dependency graph
+# 3. Review Dependabot logs in Actions tab
+# 4. Check for failed updates and address issues
+# 5. Regularly review and update ignore list
+
+# ============================================================================
+# Additional Configuration
+# ============================================================================
+# For private registries or custom package sources:
+# registries:
+#   python-private:
+#     type: "python-index"
+#     url: "https://pypi.example.com"
+#     username: "user"
+#     password: "${{secrets.PYPI_PASSWORD}}"

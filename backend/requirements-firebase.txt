@@ -1,0 +1,14 @@
+# Firebase and GCP dependencies
+# Add these to your main requirements.txt or install separately:
+# pip install -r requirements-firebase.txt
+
+# Firebase Admin SDK
+firebase-admin>=6.3.0
+
+# Google Cloud libraries
+google-cloud-firestore>=2.13.1
+google-cloud-secret-manager>=2.16.4
+google-cloud-logging>=3.8.0
+
+# Structured logging
+structlog>=23.2.0

@@ -1,0 +1,165 @@
+# ===========================================
+# GitHub Actions - Deploy to Cloud Run
+# ===========================================
+# Deploys to Google Cloud Run when:
+# - Push to main/master branch
+# - Manual workflow dispatch
+#
+# Required secrets:
+# - GCP_PROJECT_ID: Google Cloud project ID
+# - GCP_SA_KEY: Service account key JSON (or use Workload Identity)
+# - GCP_REGION: Cloud Run region (e.g., us-central1)
+
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  SERVICE_NAME: mappino-api
+  DOCKER_IMAGE: gcr.io/${{ secrets.GCP_PROJECT_ID }}/mappino-api
+
+jobs:
+  # ===========================================
+  # Run Tests First
+  # ===========================================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Create directories
+        run: |
+          mkdir -p schemas/xsd schemas/schematron schemas/rules
+          mkdir -p mappers/user_uploads
+          mkdir -p data/codelists
+
+      - name: Run tests
+        working-directory: backend
+        run: pytest tests/ -v
+
+  # ===========================================
+  # Build and Deploy
+  # ===========================================
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    # Determine environment
+    environment:
+      name: ${{ github.event.inputs.environment || 'staging' }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ===========================================
+      # Authenticate to Google Cloud
+      # ===========================================
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker --quiet
+
+      # ===========================================
+      # Build Docker Image
+      # ===========================================
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+            ${{ env.DOCKER_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ===========================================
+      # Deploy to Cloud Run
+      # ===========================================
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          region: ${{ secrets.GCP_REGION || 'us-central1' }}
+          image: ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+          flags: |
+            --allow-unauthenticated
+            --memory=1Gi
+            --cpu=1
+            --min-instances=0
+            --max-instances=10
+            --timeout=300
+            --concurrency=80
+          env_vars: |
+            DEBUG=false
+            LOG_LEVEL=INFO
+            FIREBASE_ENABLED=${{ secrets.FIREBASE_ENABLED || 'false' }}
+            FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID || '' }}
+            USE_SECRET_MANAGER=true
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+
+      - name: Show deployment URL
+        run: |
+          echo "Service deployed to: ${{ steps.deploy.outputs.url }}"
+
+      # ===========================================
+      # Verify Deployment
+      # ===========================================
+      - name: Verify deployment
+        run: |
+          echo "Checking health endpoint..."
+          curl -f "${{ steps.deploy.outputs.url }}/health" || exit 1
+          echo "Deployment verified!"
+
+      - name: Post deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service:** ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ${{ env.DOCKER_IMAGE }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.inputs.environment || 'staging' }}" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,110 @@
+# ===========================================
+# Docker Compose - Peppol Tools API
+# ===========================================
+#
+# Development:
+#   docker-compose up -d
+#
+# Production:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Rebuild:
+#   docker-compose up -d --build
+
+version: "3.8"
+
+services:
+  # ===========================================
+  # Peppol Tools API
+  # ===========================================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mappino-api
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # Application settings
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+
+      # CORS (development: allow all)
+      - CORS_ORIGINS=${CORS_ORIGINS:-["*"]}
+
+      # Rate limiting
+      - RATE_LIMIT_VALIDATION=${RATE_LIMIT_VALIDATION:-10/minute}
+      - RATE_LIMIT_LOOKUP=${RATE_LIMIT_LOOKUP:-30/minute}
+
+      # External APIs
+      - PEPPOL_DIRECTORY_BASE=${PEPPOL_DIRECTORY_BASE:-https://directory.peppol.eu}
+      - HELGER_API_BASE=${HELGER_API_BASE:-https://peppol.helger.com/api}
+      - HELGER_WSDL_URL=${HELGER_WSDL_URL:-https://peppol.helger.com/wsdvs?wsdl}
+      - HELGER_ENDPOINT=${HELGER_ENDPOINT:-https://peppol.helger.com/wsdvs}
+
+      # Firebase (optional)
+      - FIREBASE_ENABLED=${FIREBASE_ENABLED:-false}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/firebase-credentials.json
+
+      # GCP Secret Manager (optional)
+      - USE_SECRET_MANAGER=${USE_SECRET_MANAGER:-false}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
+
+      # Feature flags
+      - ENABLE_HELGER_VALIDATOR=${ENABLE_HELGER_VALIDATOR:-true}
+      - ENABLE_XSD_VALIDATOR=${ENABLE_XSD_VALIDATOR:-true}
+      - ENABLE_SCHEMATRON_VALIDATOR=${ENABLE_SCHEMATRON_VALIDATOR:-true}
+      - ENABLE_LEGACY_ROUTES=${ENABLE_LEGACY_ROUTES:-true}
+
+    volumes:
+      # Persistent data volumes
+      - ./schemas:/app/schemas
+      - ./mappers:/app/mappers
+      - ./data:/app/data
+
+      # Firebase credentials (if using)
+      - ${FIREBASE_CREDENTIALS_PATH:-./credentials}:/app/credentials:ro
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    restart: unless-stopped
+
+    # Resource limits (adjust for your environment)
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2G
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+    networks:
+      - mappino-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  mappino-network:
+    driver: bridge
+
+# ===========================================
+# Volumes (named volumes for persistence)
+# ===========================================
+volumes:
+  schemas:
+  mappers:
+  data:

@@ -1,0 +1,33 @@
+# CODEOWNERS file
+# Documentation: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything in the repo
+# * @default-owner
+
+# Security and configuration files
+/.github/ @security-team
+/setup_github.sh @devops-team
+/setup_github.ps1 @devops-team
+/.github/workflows/security.yml @security-team
+/.github/dependabot.yml @security-team
+/SECURITY_CHECKLIST.md @security-team
+
+# Infrastructure and deployment
+/Dockerfile @devops-team
+/docker-compose.yml @devops-team
+/terraform/ @devops-team
+
+# Backend code
+/backend/ @backend-team
+/backend/app/services/validators/ @validation-team
+/backend/app/services/transformer.py @transformation-team
+
+# Tests
+/backend/tests/ @qa-team
+
+# Documentation
+*.md @docs-team
+/docs/ @docs-team
+
+# Requirements and dependencies
+requirements.txt @security-team @backend-team

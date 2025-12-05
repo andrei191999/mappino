@@ -1,0 +1,89 @@
+# ===========================================
+# Docker Ignore - Peppol Tools API
+# ===========================================
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+tests/
+
+# Environment files (secrets!)
+.env
+.env.*
+*.env
+
+# Credentials (never include!)
+credentials.json
+serviceAccountKey.json
+*.pem
+*.key
+firebase-*.json
+
+# Data directories (mount as volumes instead)
+data/
+schemas/xsd/*.xsd
+schemas/xsd/common/
+schemas/schematron/peppol-bis3/
+schemas/schematron/en16931/
+schemas/sync_status.json
+mappers/user_uploads/
+
+# Documentation
+*.md
+docs/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Docker
+Dockerfile*
+docker-compose*
+.docker/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile

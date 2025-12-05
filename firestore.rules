@@ -1,0 +1,149 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user is accessing their own document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if user has admin role
+    function isAdmin() {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Check if email is verified
+    function isEmailVerified() {
+      return isAuthenticated() && request.auth.token.email_verified == true;
+    }
+
+    // Validate user data schema
+    function isValidUserData() {
+      let data = request.resource.data;
+      return data.keys().hasAll(['email', 'createdAt', 'role']) &&
+             data.email is string &&
+             data.createdAt is timestamp &&
+             data.role in ['user', 'admin'] &&
+             (!data.keys().hasAny(['displayName']) || data.displayName is string) &&
+             (!data.keys().hasAny(['photoURL']) || data.photoURL is string) &&
+             (!data.keys().hasAny(['emailVerified']) || data.emailVerified is bool) &&
+             (!data.keys().hasAny(['updatedAt']) || data.updatedAt is timestamp) &&
+             (!data.keys().hasAny(['metadata']) || data.metadata is map);
+    }
+
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+
+    // Users can read their own document, admins can read all
+    match /users/{userId} {
+      // Read: User can read their own document OR admin can read any
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Create: Only authenticated users can create their own document
+      // and cannot set themselves as admin (must be set by backend)
+      allow create: if isOwner(userId) &&
+                       isValidUserData() &&
+                       request.resource.data.role == 'user' &&
+                       request.resource.data.createdAt == request.time;
+
+      // Update: Users can update their own document, but cannot change:
+      // - uid (implicit, it's the document ID)
+      // - role (only admins can change roles)
+      // - createdAt
+      // Admins can update any user
+      allow update: if (isOwner(userId) &&
+                        isValidUserData() &&
+                        request.resource.data.role == resource.data.role &&
+                        request.resource.data.createdAt == resource.data.createdAt &&
+                        request.resource.data.updatedAt == request.time) ||
+                       isAdmin();
+
+      // Delete: Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // API KEYS COLLECTION (for storing user API keys)
+    // ============================================
+
+    match /apiKeys/{keyId} {
+      // Users can only access their own API keys
+      allow read: if isAuthenticated() &&
+                     resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.createdAt == request.time;
+
+      allow update: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid;
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+
+    // ============================================
+    // VALIDATION HISTORY (optional - for storing validation results)
+    // ============================================
+
+    match /validationHistory/{historyId} {
+      // Users can only access their own validation history
+      allow read: if isAuthenticated() &&
+                     resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.createdAt == request.time;
+
+      // Validation history is immutable (cannot be updated)
+      allow update: if false;
+
+      allow delete: if isAuthenticated() &&
+                       resource.data.userId == request.auth.uid;
+    }
+
+    // ============================================
+    // ADMIN LOGS (read-only for users, write-only for backend via Admin SDK)
+    // ============================================
+
+    match /adminLogs/{logId} {
+      // Only admins can read logs
+      allow read: if isAdmin();
+
+      // No client-side writes (only backend via Admin SDK)
+      allow write: if false;
+    }
+
+    // ============================================
+    // PUBLIC CONFIGURATION (read-only for all users)
+    // ============================================
+
+    match /publicConfig/{configId} {
+      // Anyone can read public configuration
+      allow read: if true;
+
+      // Only admins can write
+      allow write: if isAdmin();
+    }
+
+    // ============================================
+    // DEFAULT DENY ALL OTHER COLLECTIONS
+    // ============================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
